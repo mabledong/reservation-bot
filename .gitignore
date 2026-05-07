@@ -216,8 +216,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-resy_token.txt
-opentable_token.txt
-opentable_session.json
-bot_log.txt
-resy_auth.py
