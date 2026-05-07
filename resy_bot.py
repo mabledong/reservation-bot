@@ -10,12 +10,22 @@ from playwright.async_api import async_playwright
 RESY_TOKEN = os.environ.get("RESY_TOKEN")
 if not RESY_TOKEN:
     TOKEN_PATH = os.path.expanduser("~/resy-bot/resy_token.txt")
-    with open(TOKEN_PATH, "r") as f:
-        RESY_TOKEN = f.read().strip()
+    if os.path.exists(TOKEN_PATH):
+        with open(TOKEN_PATH, "r") as f:
+            RESY_TOKEN = f.read().strip()
+    else:
+        print("Error: RESY_TOKEN environment variable not set and no local token file found.")
+        print("Please add RESY_TOKEN as a GitHub Secret. See README for instructions.")
+        exit(1)
 
 GMAIL_EMAIL = os.environ.get("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 RESY_API_KEY = os.environ.get("RESY_API_KEY")
+
+if not GMAIL_EMAIL or not GMAIL_APP_PASSWORD or not RESY_API_KEY:
+    print("Error: Missing required environment variables.")
+    print("Please add GMAIL_EMAIL, GMAIL_APP_PASSWORD, and RESY_API_KEY as GitHub Secrets.")
+    exit(1)
 
 CARRIER_GATEWAYS = {
     "tmobile": "tmomail.net",
