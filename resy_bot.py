@@ -17,6 +17,17 @@ GMAIL_EMAIL = os.environ.get("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 RESY_API_KEY = os.environ.get("RESY_API_KEY")
 
+CARRIER_GATEWAYS = {
+    "tmobile": "tmomail.net",
+    "att": "txt.att.net",
+    "verizon": "vtext.com",
+    "sprint": "messaging.sprintpcs.com",
+    "cricket": "sms.cricketwireless.net",
+    "metro": "mymetropcs.com",
+    "boost": "sms.myboostmobile.com",
+    "uscellular": "email.uscc.net",
+}
+
 CITY_COORDS = {
     "new-york-ny": (40.7128, -74.0060),
     "los-angeles-ca": (34.0522, -118.2437),
@@ -35,9 +46,19 @@ with open(CONFIG_PATH) as f:
 
 PARTY_SIZE = config["party_size"]
 CITY = config.get("city", "new-york-ny")
+PHONE_NUMBER = config.get("phone_number")
+PHONE_CARRIER = config.get("phone_carrier")
 RESTAURANTS = [r for r in config["restaurants"] if r["platform"] == "resy" and r.get("active", True)]
 
 _url_cache = {}
+
+
+def get_sms_address():
+    if PHONE_NUMBER and PHONE_CARRIER:
+        gateway = CARRIER_GATEWAYS.get(PHONE_CARRIER.lower())
+        if gateway:
+            return f"{PHONE_NUMBER}@{gateway}"
+    return None
 
 
 async def find_resy_url(name, city):
@@ -91,7 +112,7 @@ def time_slots_12h(time_start, time_end):
     return slots
 
 
-def send_email(restaurant, date, time_slot):
+def send_notifications(restaurant, date, time_slot):
     subject = f"Booked: {restaurant} on {date} at {time_slot}!"
     body = f"""
 Your reservation has been booked automatically!
@@ -103,18 +124,26 @@ Party size: {PARTY_SIZE}
 
 Check your Resy app to confirm.
     """
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = GMAIL_EMAIL
-    msg["To"] = GMAIL_EMAIL
+
+    recipients = [GMAIL_EMAIL]
+    sms_address = get_sms_address()
+    if sms_address:
+        recipients.append(sms_address)
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_EMAIL, GMAIL_EMAIL, msg.as_string())
-        print(f"  Email notification sent!")
+            for recipient in recipients:
+                msg = MIMEText(body)
+                msg["Subject"] = subject
+                msg["From"] = GMAIL_EMAIL
+                msg["To"] = recipient
+                server.sendmail(GMAIL_EMAIL, recipient, msg.as_string())
+        print(f"  Notifications sent!")
+        if sms_address:
+            print(f"  SMS sent to {PHONE_NUMBER}")
     except Exception as e:
-        print(f"  Email failed: {e}")
+        print(f"  Notification failed: {e}")
 
 
 async def inject_token(context):
@@ -154,7 +183,7 @@ async def book_restaurant(page, restaurant, date):
                     await reserve_btn.first.click()
                     await page.wait_for_timeout(3000)
                     print(f"  Booked {name} at {time_slot} on {date}!")
-                    send_email(name, date, time_slot)
+                    send_notifications(name, date, time_slot)
                     return True
         except Exception as e:
             print(f"  Error trying {time_slot}: {e}")

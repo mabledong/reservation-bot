@@ -9,18 +9,38 @@ from email.mime.text import MIMEText
 GMAIL_EMAIL = os.environ.get("GMAIL_EMAIL")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
+CARRIER_GATEWAYS = {
+    "tmobile": "tmomail.net",
+    "att": "txt.att.net",
+    "verizon": "vtext.com",
+    "sprint": "messaging.sprintpcs.com",
+    "cricket": "sms.cricketwireless.net",
+    "metro": "mymetropcs.com",
+    "boost": "sms.myboostmobile.com",
+    "uscellular": "email.uscc.net",
+}
+
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "restaurants.json")
 with open(CONFIG_PATH) as f:
     config = json.load(f)
 
 PARTY_SIZE = config["party_size"]
+PHONE_NUMBER = config.get("phone_number")
+PHONE_CARRIER = config.get("phone_carrier")
 RESTAURANTS = [r for r in config["restaurants"] if r["platform"] == "opentable" and r.get("active", True)]
 
 _venue_cache = {}
 
 
+def get_sms_address():
+    if PHONE_NUMBER and PHONE_CARRIER:
+        gateway = CARRIER_GATEWAYS.get(PHONE_CARRIER.lower())
+        if gateway:
+            return f"{PHONE_NUMBER}@{gateway}"
+    return None
+
+
 def find_opentable_venue(name):
-    """Search OpenTable to find a restaurant's rid and URL by name."""
     if name in _venue_cache:
         return _venue_cache[name]
 
@@ -68,7 +88,7 @@ def time_slots_24h(time_start, time_end):
     return slots
 
 
-def send_alert_email(restaurant, date, available_times, booking_url):
+def send_notifications(restaurant, date, available_times, booking_url):
     times_str = ", ".join(available_times)
     subject = f"{restaurant} has availability for {date}!"
     body = f"""
@@ -81,18 +101,26 @@ Click here to book now:
 
 Act fast - these go quickly!
     """
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = GMAIL_EMAIL
-    msg["To"] = GMAIL_EMAIL
+
+    recipients = [GMAIL_EMAIL]
+    sms_address = get_sms_address()
+    if sms_address:
+        recipients.append(sms_address)
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_EMAIL, GMAIL_EMAIL, msg.as_string())
-        print(f"  Alert email sent!")
+            for recipient in recipients:
+                msg = MIMEText(body)
+                msg["Subject"] = subject
+                msg["From"] = GMAIL_EMAIL
+                msg["To"] = recipient
+                server.sendmail(GMAIL_EMAIL, recipient, msg.as_string())
+        print(f"  Notifications sent!")
+        if sms_address:
+            print(f"  SMS sent to {PHONE_NUMBER}")
     except Exception as e:
-        print(f"  Email failed: {e}")
+        print(f"  Notification failed: {e}")
 
 
 def check_availability(restaurant, date):
@@ -146,7 +174,7 @@ def check_availability(restaurant, date):
 
             if slots:
                 print(f"  Found availability: {slots}")
-                send_alert_email(name, date, slots, url or "https://www.opentable.com")
+                send_notifications(name, date, slots, url or "https://www.opentable.com")
                 return True
             else:
                 print(f"  No availability found for {name} on {date}")
