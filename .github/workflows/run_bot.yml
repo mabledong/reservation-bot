@@ -26,6 +26,7 @@ jobs:
       - name: Run Resy bot
         env:
           RESY_TOKEN: ${{ secrets.RESY_TOKEN }}
+          RESY_API_KEY: ${{ secrets.RESY_API_KEY }}
           GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RESY_PHONE: ${{ secrets.RESY_PHONE }}
