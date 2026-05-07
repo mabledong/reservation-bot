@@ -1,6 +1,8 @@
 {
   "party_size": 2,
   "city": "new-york-ny",
+  "phone_number": "2125551234",
+  "phone_carrier": "tmobile",
   "restaurants": [
     {
       "name": "Don Angie",
